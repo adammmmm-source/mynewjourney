@@ -1,0 +1,238 @@
+<html>
+        <head><title>Downloaded HTML</title></head>
+        <body>
+            <pre style="white-space: pre-wrap; word-wrap: break-word;"><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Definite Integration Calculator</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        window.MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+            svg: { fontCache: 'global' }
+        };
+    </script>
+    <script type="text/javascript" id="MathJax-script" async
+        src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col items-center py-10 px-4">
+
+    <div class="max-w-5xl w-full bg-gray-800 rounded-xl shadow-2xl p-6 md:p-8 flex flex-col md:flex-row gap-8">
+        
+        <div class="w-full md:w-2/5 flex flex-col justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-indigo-400 mb-2">Integration Calculator</h1>
+                <p class="text-gray-400 text-sm mb-6">Calculate and visualize the definite integral $\int_{a}^{b} f(x) \, dx$</p>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Function $f(x)$</label>
+                    <input type="text" id="functionInput" value="x^2 - 2x + 1" 
+                        class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2.5 text-white font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none transition">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Lower Bound ($a$)</label>
+                        <input type="number" id="boundA" value="0" step="any"
+                            class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Upper Bound ($b$)</label>
+                        <input type="number" id="boundB" value="3" step="any"
+                            class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div id="errorMessage" class="text-red-400 text-sm hidden bg-red-900/30 border border-red-500/40 rounded-lg p-3 mb-4"></div>
+            </div>
+
+            <div class="bg-gray-700/50 border border-gray-700 rounded-xl p-5 mt-4">
+                <div class="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-2">Mathematical Notation</div>
+                <div id="mathDisplay" class="text-xl text-center py-2 text-indigo-200 overflow-x-auto min-h-[3rem] flex items-center justify-center">
+                    $$\int_{0}^{3} (x^2 - 2x + 1) \, dx$$
+                </div>
+                <hr class="border-gray-700 my-3">
+                <div class="flex justify-between items-center mt-2">
+                    <span class="text-sm font-medium text-gray-300">Result Area:</span>
+                    <span id="resultValue" class="text-2xl font-bold text-emerald-400">3.0000</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="w-full md:w-3/5 bg-gray-950 rounded-xl p-4 relative min-h-[400px] flex items-center justify-center">
+            <canvas id="graphCanvas"></canvas>
+        </div>
+
+    </div>
+
+    <script>
+        // DOM Elements
+        const functionInput = document.getElementById('functionInput');
+        const boundAInput = document.getElementById('boundA');
+        const boundBInput = document.getElementById('boundB');
+        const mathDisplay = document.getElementById('mathDisplay');
+        const resultValue = document.getElementById('resultValue');
+        const errorMessage = document.getElementById('errorMessage');
+        const ctx = document.getElementById('graphCanvas').getContext('2d');
+
+        let chart;
+
+        // Numerical Integration using Simpson's Rule
+        function simpsonsRule(f, a, b, n = 1000) {
+            if (n % 2 !== 0) n++; // n must be even
+            const h = (b - a) / n;
+            let sum = f(a) + f(b);
+
+            for (let i = 1; i < n; i++) {
+                const x = a + i * h;
+                sum += i % 2 === 0 ? 2 * f(x) : 4 * f(x);
+            }
+            return (h / 3) * sum;
+        }
+
+        // Core logic to parse expressions and update UI
+        function calculateAndGraph() {
+            const exprString = functionInput.value.trim();
+            const a = parseFloat(boundAInput.value);
+            const b = parseFloat(boundBInput.value);
+
+            // Basic Validation
+            if (isNaN(a) || isNaN(b)) {
+                showError("Please enter valid numeric boundaries.");
+                return;
+            }
+
+            try {
+                // Parse expression via Math.js
+                const compiledExpr = math.compile(exprString);
+                const f = (x) => compiledExpr.evaluate({ x: x });
+
+                // Test if function evaluates properly at 'a' to catch hidden formula errors
+                f(a); 
+                hideError();
+
+                // 1. Calculate the Integral
+                const result = simpsonsRule(f, a, b);
+                resultValue.textContent = Number.isInteger(result) ? result : result.toFixed(5);
+
+                // 2. Update MathJax dynamic preview
+                try {
+                    const node = math.parse(exprString).toTex();
+                    mathDisplay.innerHTML = `$$\\int_{${a}}^{${b}} (${node}) \\, dx$$`;
+                    MathJax.typesetPromise([mathDisplay]);
+                } catch (e) {
+                    // Fallback notation if LaTeX conversion fails slightly
+                    mathDisplay.innerHTML = `$$\\int_{${a}}^{${b}} \\text{f}(x) \\, dx$$`;
+                }
+
+                // 3. Generate data structures for Charting
+                const points = 200;
+                // Padding ensures we see context outside just the bounded area
+                const padding = Math.max(Math.abs(b - a) * 0.4, 2);
+                const startX = Math.min(a, b) - padding;
+                const endX = Math.max(a, b) + padding;
+                const step = (endX - startX) / points;
+
+                const lineData = [];
+                const fillData = [];
+
+                for (let i = 0; i <= points; i++) {
+                    const x = startX + i * step;
+                    let y;
+                    try {
+                        y = f(x);
+                    } catch(err) { y = null; }
+
+                    if (typeof y === 'number' && !isNaN(y) && isFinite(y)) {
+                        lineData.push({ x: x, y: y });
+                        
+                        // Populate filled area data inside bounds [a, b]
+                        if (x >= Math.min(a, b) && x <= Math.max(a, b)) {
+                            fillData.push({ x: x, y: y });
+                        }
+                    }
+                }
+
+                updateChart(lineData, fillData, a, b);
+
+            } catch (error) {
+                showError("Invalid mathematical syntax. Examples: x^2, sin(x), 2*x + 5, e^x");
+            }
+        }
+
+        function updateChart(lineData, fillData, a, b) {
+            if (chart) {
+                chart.destroy();
+            }
+
+            chart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        {
+                            label: 'f(x)',
+                            data: lineData,
+                            showLine: true,
+                            borderColor: '#818cf8',
+                            borderWidth: 3,
+                            pointRadius: 0,
+                            fill: false,
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Integrated Area',
+                            data: fillData,
+                            showLine: true,
+                            borderColor: 'transparent',
+                            pointRadius: 0,
+                            backgroundColor: 'rgba(52, 211, 153, 0.25)',
+                            fill: 'origin', // Fills down to the x-axis
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            position: 'bottom',
+                            grid: { color: '#374151' },
+                            ticks: { color: '#9ca3af' }
+                        },
+                        y: {
+                            type: 'linear',
+                            grid: { color: '#374151' },
+                            ticks: { color: '#9ca3af' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function showError(msg) {
+            errorMessage.textContent = msg;
+            errorMessage.classList.remove('hidden');
+        }
+
+        function hideError() {
+            errorMessage.classList.add('hidden');
+        }
+
+        // Live updating Event Listeners
+        functionInput.addEventListener('input', calculateAndGraph);
+        boundAInput.addEventListener('input', calculateAndGraph);
+        boundBInput.addEventListener('input', calculateAndGraph);
+
+        // Initial build on load
+        window.addEventListener('DOMContentLoaded', calculateAndGraph);
+    </script>
+</body>
+</html></pre>
+        </body>
+    </html>
